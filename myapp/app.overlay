@@ -1,0 +1,83 @@
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/mipi_dbi/mipi_dbi.h>
+#include <dt-bindings/dma/rpi-pico-dma-rp2040.h>
+
+/ {
+    aliases {
+        flashbutton = &flash_button_gpio;
+    };
+
+    buttons {
+        compatible = "gpio-keys";
+        flash_button_gpio: flash_button {
+            gpios = <&pico_header 15 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+        };
+    };
+};
+
+// &dma  { status = "okay";  };
+
+&spi0 {
+    status = "okay";
+    pinctrl-0 = <&spi0_default>;
+    pinctrl-names = "default";
+
+    // dmas = <&dma 0 RPI_PICO_DMA_SLOT_SPI0_TX 0>, <&dma 1 RPI_PICO_DMA_SLOT_SPI0_RX 0>;
+    // dma-names = "tx", "rx";
+
+    cs-gpios = <&pico_header 17 GPIO_ACTIVE_LOW>;
+    #address-cells = <1>;
+    #size-cells = <0>;
+};
+
+/ {
+    mipi_dbi_block {
+        compatible = "zephyr,mipi-dbi-spi";
+        spi-dev = <&spi0>;
+        dc-gpios = <&pico_header 12 GPIO_ACTIVE_HIGH>;
+        reset-gpios = <&pico_header 13 GPIO_ACTIVE_LOW>;
+        write-only;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        st7305: st7305@0 {
+            compatible = "sitronix,st7305";
+            mipi-max-frequency = <24000000>;
+            mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+            reg = <0>;
+            width = <168>;
+            height = <384>;
+            start-line = <0>;
+            start-column = <48>; // (264-physical width)/2
+            nvm-load = [13 02];
+            gate-voltages = [08 06];
+            vsh = [3C 3E 3C 3C];
+            vsl = [23 21 23 23];
+            vshn = [5A 5C 5A 5A];
+            vsln = [37 35 37 37];
+            osc-settings = <0xA6>;
+            framerate = <0x05>;
+            multiplex-ratio = <0x60>;
+            source-voltage = <0>;
+            remap-value = <0x48>;
+            panel-settings = <0x29>;
+            // inversion-on;
+
+            hpm-gate-waveform = [E5 F6 17 77 77 77 77 77 77 71];
+            lpm-gate-waveform = [05 46 77 77 77 77 76 45];
+        };
+    };
+
+    /* 5. 告知 Zephyr 系统的默认显示器指向该屏幕 */
+    chosen {
+        zephyr,display = &st7305;
+        zephyr,console = &cdc_acm_uart0;
+    };
+};
+
+&zephyr_udc0 {
+    cdc_acm_uart0: cdc_acm_uart0 {
+        compatible = "zephyr,cdc-acm-uart";
+    };
+};
+
